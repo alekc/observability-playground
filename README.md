@@ -85,13 +85,22 @@ services see traffic. To generate some on both:
 for i in $(seq 1 200); do curl -s http://$APP/slow >/dev/null; curl -s http://$APP/backend/slow >/dev/null; done
 ```
 
-The Node Exporter Full dashboard covers appserver's system health (CPU, memory,
-disk, network):
+The Application Performance dashboard has two tabs. **App** shows the RED
+metrics, per-service error rate, frontend/backend latency, request rate, and
+status codes:
+
+![Application Performance dashboard, App tab](docs/images/full-app.png)
+
+**System** shows per-container resource usage (CPU, memory, network, disk):
+
+![Application Performance dashboard, System tab](docs/images/full-system.png)
+
+The Node Exporter Full dashboard covers appserver's host-level system health:
 
 ![Node Exporter Full dashboard](docs/images/node-exporter-full.png)
 
-The Application Performance dashboard is shown in the alert screenshots
-([docs/alerts-screenshots.md](docs/alerts-screenshots.md)).
+The App tab is also shown with alerts firing in
+[docs/alerts-screenshots.md](docs/alerts-screenshots.md).
 
 ## Triggering alerts
 
