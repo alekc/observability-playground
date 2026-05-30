@@ -1,0 +1,85 @@
+# Pre-commit hooks for the observability project. Install once with:
+#   pre-commit install
+# Run against everything on demand with:
+#   pre-commit run --all-files
+# Bump pinned hook versions with:
+#   pre-commit autoupdate
+# Python-based hooks build a virtualenv; pin a known-good interpreter so a
+# broken system Python (e.g. a libexpat-mismatched build) does not fail setup.
+default_language_version:
+  python: python3.13
+repos:
+  # General hygiene: whitespace, EOF, merge markers, big files, syntax.
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: ["--maxkb=1024"]
+      - id: check-json
+      - id: check-yaml
+        args: ["--allow-multiple-documents"]
+        # Jinja templates are not valid standalone YAML.
+        exclude: '\.j2$'
+      - id: mixed-line-ending
+        args: ["--fix=lf"]
+
+  # YAML style (compose, mimir, alert rules, provisioning). Config in .yamllint.
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.35.1
+    hooks:
+      - id: yamllint
+        args: ["-c", ".yamllint"]
+
+  # Shell scripts (build-and-publish.sh, user_data.sh). SC1091 is the
+  # "can't follow sourced file" info for runtime-only paths like /etc/os-release.
+  - repo: https://github.com/koalaman/shellcheck-precommit
+    rev: v0.10.0
+    hooks:
+      - id: shellcheck
+        args: ["--exclude=SC1091"]
+
+  # Secret scanning: block tokens, keys, and credentials before they land.
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.2
+    hooks:
+      - id: gitleaks
+
+  # Project-specific checks that use tools already required by the stack.
+  - repo: local
+    hooks:
+      # Grafana dashboard normalize + provisioning guard. See
+      # scripts/normalize-dashboards.py.
+      - id: grafana-dashboards
+        name: Grafana dashboard normalize + provisioning guard
+        entry: python3 scripts/normalize-dashboards.py
+        language: system
+        pass_filenames: true
+        files: '^phase02/observer/grafana/(dashboards/.*\.json|provisioning/dashboards/.*\.ya?ml)$'
+
+      # OpenTofu formatting for the infrastructure code.
+      - id: tofu-fmt
+        name: tofu fmt (phase01)
+        entry: tofu fmt -check -recursive phase01
+        language: system
+        pass_filenames: false
+        files: '^phase01/.*\.tf$'
+
+      # Validate Prometheus alerting rules parse and have valid expressions.
+      - id: promtool-rules
+        name: promtool check rules
+        entry: promtool check rules alerts/rules.yaml
+        language: system
+        pass_filenames: false
+        files: '^alerts/rules\.yaml$'
+
+      # Lint the Ansible playbook with the production profile. Runs from the
+      # ansible dir so it picks up ansible.cfg and the installed collections.
+      - id: ansible-lint
+        name: ansible-lint (phase02)
+        entry: bash -c 'cd phase02/ansible && ansible-lint'
+        language: system
+        pass_filenames: false
+        files: '^phase02/ansible/'

@@ -1,0 +1,26 @@
+# Terraform
+**/.terraform/
+**/.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+
+# Generated SSH key
+project-key.pem
+*.pem
+
+# Runtime env files
+**/.env
+.envrc
+
+# Ansible
+*.retry
+
+# Go build artifacts
+app/app
+
+# macOS
+.DS_Store
+**/.DS_Store
+.ansible

@@ -1,0 +1,16 @@
+---
+# phase01 OpenTofu state: the single source of host addresses and the SSH key.
+phase01_dir: "{{ playbook_dir }}/../../phase01"
+
+# Binary the tf_output lookup shells out to. Prefer tofu, fall back to
+# terraform. The lookup defaults to "terraform", which would break on a
+# tofu-only host, so pin it explicitly.
+tofu_bin: "{{ lookup('ansible.builtin.pipe', 'command -v tofu || command -v terraform') }}"
+
+ansible_user: ubuntu
+ansible_ssh_private_key_file: "{{ phase01_dir }}/project-key.pem"
+ansible_ssh_common_args: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+
+# Where the stacks are copied on each host. Mirrors the repo layout so the
+# observer compose mount ../../alerts/rules.yaml resolves on the remote too.
+remote_dir: "{{ ansible_facts['user_dir'] }}/project-observability"

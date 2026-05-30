@@ -1,0 +1,13 @@
+# Relaxed yamllint: catch real problems (syntax, duplicate keys, bad
+# indentation) without nagging about line length or document-start markers,
+# which do not matter for these compose / config files.
+extends: default
+
+rules:
+  line-length: disable
+  document-start: disable
+  comments-indentation: disable
+  truthy:
+    level: warning
+  comments:
+    min-spaces-from-content: 1

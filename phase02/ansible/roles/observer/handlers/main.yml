@@ -1,0 +1,28 @@
+---
+# Mimir reads its bind-mounted config only at startup, so restart it to pick up
+# rule/config edits. Ordered before the AM reload so that runs after mimir is
+# back (the reload retries meanwhile).
+- name: Restart mimir to reload rules and config
+  community.docker.docker_compose_v2:
+    project_src: "{{ remote_dir }}/phase02/observer"
+    state: restarted
+    services:
+      - mimir
+
+# Mimir's embedded Alertmanager applies fallback_config_file only once per
+# tenant, so re-push the desired config via the API on any change. Idempotent;
+# retries while Mimir is still starting.
+- name: Reload Mimir alertmanager config
+  ansible.builtin.uri:
+    url: http://localhost:9009/api/v1/alerts
+    method: POST
+    headers:
+      X-Scope-OrgID: anonymous
+      Content-Type: application/yaml
+    body: "{{ lookup('template', 'am-api-config.yaml.j2') }}"
+    body_format: raw
+    status_code: [200, 201, 202]
+  register: observer_am_reload
+  until: observer_am_reload is succeeded
+  retries: 24
+  delay: 5

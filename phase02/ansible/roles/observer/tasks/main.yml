@@ -1,0 +1,38 @@
+---
+- name: Ensure remote directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ remote_dir }}/phase02/observer"
+    - "{{ remote_dir }}/alerts"
+
+- name: Copy the observability stack (observer)
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../observer/"
+    dest: "{{ remote_dir }}/phase02/observer/"
+    mode: preserve
+  # Grafana auto-reloads provisioned dashboards from disk; a config change here
+  # re-pushes the Alertmanager config (see handlers).
+  notify: Reload Mimir alertmanager config
+
+- name: Copy the alert rules
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../../alerts/"
+    dest: "{{ remote_dir }}/alerts/"
+    mode: preserve
+  # Restart mimir so the ruler loads the change now rather than on its poll.
+  notify: Restart mimir to reload rules and config
+
+- name: Render .env with Grafana's external URL
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ remote_dir }}/phase02/observer/.env"
+    mode: "0644"
+
+- name: Bring up the observability stack
+  community.docker.docker_compose_v2:
+    project_src: "{{ remote_dir }}/phase02/observer"
+    state: present
+    pull: always

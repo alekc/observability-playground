@@ -1,0 +1,96 @@
+# appserver: application stack (caddy + frontend + backend + alloy).
+# Requires OBSERVER_IP (observer private IP) in a .env file beside this compose.
+services:
+  # Frontend and backend run the same image; they are told apart in metrics and
+  # logs by container name and scrape job. Host ports are loopback-only, public
+  # traffic comes through Caddy on :80.
+  frontend:
+    image: al3kc/observability-demo:v0.0.2
+    container_name: frontend
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"
+    # 512m leaves room for the /mem load endpoint to cross the 85% memory alert
+    # threshold before the OOM killer.
+    mem_limit: 512m
+    networks:
+      - appnet
+
+  backend:
+    image: al3kc/observability-demo:v0.0.2
+    container_name: backend
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8081:8080"
+    mem_limit: 512m
+    networks:
+      - appnet
+
+  caddy:
+    image: caddy:2.11.3
+    container_name: caddy
+    restart: unless-stopped
+    depends_on:
+      - frontend
+      - backend
+    ports:
+      - "80:80"
+      # :2019 (admin/metrics) is not published; Alloy scrapes it as caddy:2019.
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    mem_limit: 128m
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/caddy-health"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+    networks:
+      - appnet
+
+  alloy:
+    image: grafana/alloy:v1.16.1
+    container_name: alloy
+    restart: unless-stopped
+    # privileged + pid/cgroup host so cAdvisor sees every container's cgroup
+    # (cgroup v2 otherwise hides sibling containers in a private namespace).
+    privileged: true
+    pid: host
+    cgroup: host
+    command:
+      - run
+      - /etc/alloy/config.alloy
+      - --storage.path=/var/lib/alloy/data
+      - --server.http.listen-addr=0.0.0.0:12345
+    environment:
+      OBSERVER_IP: ${OBSERVER_IP:?OBSERVER_IP must be set to observer private IP}
+    ports:
+      - "12345:12345" # Alloy UI
+    volumes:
+      - ./alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - alloy_data:/var/lib/alloy/data
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # unix exporter reads host metrics via these paths.
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+      # cAdvisor reads cgroup/container stats from these; without them the
+      # container_* metrics come back empty.
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+      # overlayfs driver: cAdvisor resolves per-container names via containerd.
+      - /run/containerd/containerd.sock:/run/containerd/containerd.sock:ro
+    mem_limit: 512m
+    networks:
+      - appnet
+
+networks:
+  appnet:
+    driver: bridge
+
+volumes:
+  caddy_data:
+  caddy_config:
+  alloy_data:

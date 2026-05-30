@@ -1,0 +1,63 @@
+# Prometheus-format alerting rules, loaded by the Mimir ruler from local
+# storage. With multi-tenancy disabled the active tenant is "anonymous", so
+# this file is mounted at /etc/mimir/rules/anonymous/rules.yaml (see
+# observer/docker-compose.yml).
+groups:
+  - name: project-observability
+    rules:
+      # 1. Any scrape target (caddy, frontend or backend) is down.
+      - alert: AppDown
+        expr: up{job=~"caddy|frontend|backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.job }} is down"
+          description: "Scrape target **{{ $labels.job }}** ({{ $labels.instance }}) has been unreachable for over 1 minute."
+
+      # 2. Per-service (by job) 5xx rate above 5% over 5m.
+      - alert: HighErrorRate
+        expr: |
+          100 * sum by (job) (rate(app_requests_total{status=~"5.."}[5m]))
+            / clamp_min(sum by (job) (rate(app_requests_total[5m])), 1) > 5
+        for: 90s
+        labels:
+          severity: warning
+        annotations:
+          summary: "High error rate on {{ $labels.job }}"
+          description: "5xx responses are **{{ printf \"%.1f\" $value }}%** of all requests on **{{ $labels.job }}** over the last 5m (threshold 5%)."
+
+      # 3. A container is using more than 85% of its memory limit.
+      - alert: HighMemoryUsage
+        expr: |
+          container_memory_usage_bytes{job="cadvisor", name!=""}
+            / (container_spec_memory_limit_bytes{job="cadvisor", name!=""} > 0) * 100 > 85
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container {{ $labels.name }} memory high"
+          description: "**{{ $labels.name }}** is at **{{ printf \"%.1f\" $value }}%** of its memory limit (threshold 85%)."
+
+      # 4. A container burning more than 0.8 CPU cores over 5m (cAdvisor,
+      # per-container; no CPU limit set, so this is absolute cores).
+      - alert: HighCPUUsage
+        expr: |
+          sum by (name) (rate(container_cpu_usage_seconds_total{job="cadvisor", name!=""}[5m])) > 0.8
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container {{ $labels.name }} CPU high"
+          description: "**{{ $labels.name }}** is using **{{ printf \"%.2f\" $value }} CPU cores** over 5m (threshold 0.8)."
+
+      # 5. Per-service (by job) p95 latency above 400ms over 5m.
+      - alert: SlowResponseTime
+        expr: |
+          histogram_quantile(0.95, sum by (job, le) (rate(app_request_duration_seconds_bucket[5m]))) > 0.4
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Slow responses on {{ $labels.job }}"
+          description: "p95 latency on **{{ $labels.job }}** is **{{ printf \"%.3f\" $value }}s** over 5m (threshold 0.4s)."

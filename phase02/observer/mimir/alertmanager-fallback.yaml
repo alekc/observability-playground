@@ -1,0 +1,21 @@
+# Fallback Alertmanager config for Mimir's embedded Alertmanager (anonymous
+# tenant). Routes every alert to a public ntfy.sh topic.
+#
+# The webhook URL uses ntfy inline templating (tpl=yes) + markdown=yes so the
+# notification shows a clean, bold title/message instead of raw JSON. The
+# templates are URL-encoded below; decoded they are:
+#   title: {{if eq .status "firing"}}🚨{{else}}✅{{end}} {{.commonLabels.alertname}} ({{.commonLabels.severity}})
+#   msg:   {{range .alerts}}{{.annotations.description}}
+#          Started: {{.startsAt | toDate ... | date "2006-01-02 15:04 MST"}}{{end}}
+route:
+  receiver: ntfy
+  group_by: ['alertname']
+  group_wait: 30s
+  group_interval: 1m
+  repeat_interval: 1h
+
+receivers:
+  - name: ntfy
+    webhook_configs:
+      - url: "https://ntfy.sh/alekc-project-observability-demo?tpl=yes&markdown=yes&t=%7B%7Bif%20eq%20.status%20%22firing%22%7D%7D%F0%9F%9A%A8%7B%7Belse%7D%7D%E2%9C%85%7B%7Bend%7D%7D%20%7B%7B.commonLabels.alertname%7D%7D%20%28%7B%7B.commonLabels.severity%7D%7D%29&m=%7B%7Brange%20.alerts%7D%7D%7B%7B.annotations.description%7D%7D%0AStarted%3A%20%7B%7B.startsAt%20%7C%20toDate%20%222006-01-02T15%3A04%3A05.999Z07%3A00%22%20%7C%20date%20%222006-01-02%2015%3A04%20MST%22%7D%7D%0A%7B%7Bend%7D%7D"
+        send_resolved: true

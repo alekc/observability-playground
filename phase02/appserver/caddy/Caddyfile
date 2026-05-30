@@ -1,0 +1,43 @@
+{
+	# Expose the admin/metrics API on all interfaces so the Alloy container can
+	# scrape http://caddy:2019/metrics. In production this port must NOT be
+	# internet-reachable (it is not opened in the security group).
+	admin 0.0.0.0:2019
+
+	# Enable Prometheus metrics (caddy_http_request_duration_seconds, etc),
+	# served at the admin endpoint /metrics.
+	metrics
+
+	# Structured access logs for every site, emitted as JSON to stdout so the
+	# Docker log driver (and Alloy -> Loki) picks them up.
+	log {
+		output stdout
+		format json
+	}
+}
+
+:80 {
+	# Independent health endpoint answered directly by Caddy, never proxied,
+	# so you can distinguish "Caddy is up" from "the app is up".
+	@health path /caddy-health
+	respond @health "OK" 200
+
+	# Backend (same image) under /backend/*. handle_path strips the /backend
+	# prefix, so /backend/slow reaches the backend container as /slow.
+	handle_path /backend/* {
+		reverse_proxy backend:8080 {
+			health_uri /health
+			health_interval 10s
+			health_timeout 2s
+		}
+	}
+
+	# Everything else is reverse-proxied to the frontend application.
+	handle {
+		reverse_proxy frontend:8080 {
+			health_uri /health
+			health_interval 10s
+			health_timeout 2s
+		}
+	}
+}

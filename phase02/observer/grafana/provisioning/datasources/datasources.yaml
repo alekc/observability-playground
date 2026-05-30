@@ -1,0 +1,38 @@
+apiVersion: 1
+
+datasources:
+  # Mimir exposes a Prometheus-compatible query API under /prometheus.
+  - name: Mimir
+    uid: mimir
+    type: prometheus
+    access: proxy
+    url: http://mimir:9009/prometheus
+    isDefault: true
+    jsonData:
+      httpMethod: POST
+      # Point Grafana's "Alerting" view at Mimir's embedded Alertmanager and
+      # let Grafana manage rules through Mimir (rules themselves are loaded by
+      # the Mimir ruler from local files).
+      manageAlerts: true
+      alertmanagerUid: mimir-alertmanager
+      prometheusType: Mimir
+      timeInterval: 15s
+
+  - name: Loki
+    uid: loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    jsonData:
+      maxLines: 1000
+
+  # Mimir's embedded Alertmanager, so firing alerts and silences are visible
+  # in Grafana's Alerting UI.
+  - name: Mimir Alertmanager
+    uid: mimir-alertmanager
+    type: alertmanager
+    access: proxy
+    url: http://mimir:9009/alertmanager
+    jsonData:
+      implementation: mimir
+      handleGrafanaManagedAlerts: false

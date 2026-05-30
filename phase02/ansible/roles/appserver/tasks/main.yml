@@ -1,0 +1,29 @@
+---
+- name: Ensure remote directory exists
+  ansible.builtin.file:
+    path: "{{ remote_dir }}/phase02/appserver"
+    state: directory
+    mode: "0755"
+
+- name: Copy the application stack (appserver)
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../appserver/"
+    dest: "{{ remote_dir }}/phase02/appserver/"
+    mode: preserve
+  # Caddy and Alloy read their bind-mounted config only at start, so restart
+  # them on a change to load it (see handlers).
+  notify: Restart caddy and alloy
+
+- name: Render .env with the observer private IP
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ remote_dir }}/phase02/appserver/.env"
+    mode: "0644"
+
+- name: Bring up the application stack
+  community.docker.docker_compose_v2:
+    project_src: "{{ remote_dir }}/phase02/appserver"
+    state: present
+    pull: always
+    # Drop containers for services removed/renamed in the compose file.
+    remove_orphans: true

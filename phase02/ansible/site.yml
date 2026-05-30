@@ -1,0 +1,109 @@
+---
+# Deploy phase02. observer (observability backend) comes up first so its
+# metric/log endpoints exist when appserver's Alloy starts pushing.
+
+# Pre-flight: the inventory addresses come from phase01 outputs, so fail early
+# with a clear message if phase01 has not been applied yet (rather than a
+# cryptic lookup error mid-connection).
+- name: Pre-flight checks
+  hosts: localhost
+  gather_facts: false
+  vars:
+    phase01_dir: "{{ playbook_dir }}/../../phase01"
+    tofu_bin: "{{ lookup('ansible.builtin.pipe', 'command -v tofu || command -v terraform') }}"
+  tasks:
+    - name: Read phase01 outputs
+      ansible.builtin.command:
+        cmd: "{{ tofu_bin }} -chdir={{ phase01_dir }} output -json"
+      register: phase01_outputs
+      changed_when: false
+      failed_when: false
+    - name: Require phase01 to be applied first
+      ansible.builtin.fail:
+        msg: >-
+          phase01 has no outputs. Run `tofu apply` in phase01/ (with AWS
+          credentials exported) before deploying phase02 -- the inventory
+          reads host addresses from those outputs.
+      when: "'observer_public_ip' not in (phase01_outputs.stdout | default('{}', true) | from_json)"
+
+- name: Deploy observability backend (observer)
+  hosts: observer
+  gather_facts: true
+  pre_tasks:
+    - name: Wait for SSH to come up
+      ansible.builtin.wait_for_connection:
+        timeout: 300
+    - name: Wait for Docker to be ready
+      ansible.builtin.command: docker info
+      register: docker_info
+      changed_when: false
+      until: docker_info.rc == 0
+      retries: 30
+      delay: 10
+  roles:
+    - observer
+
+- name: Deploy application stack (appserver)
+  hosts: appserver
+  gather_facts: true
+  pre_tasks:
+    - name: Wait for SSH to come up
+      ansible.builtin.wait_for_connection:
+        timeout: 300
+    - name: Wait for Docker to be ready
+      ansible.builtin.command: docker info
+      register: docker_info
+      changed_when: false
+      until: docker_info.rc == 0
+      retries: 30
+      delay: 10
+  roles:
+    - appserver
+
+- name: Print connection details
+  hosts: localhost
+  gather_facts: false
+  connection: local
+  vars:
+    # In a var so the printed command lines stay under ansible-lint's limit.
+    app_url: "http://{{ hostvars['appserver'].ansible_host }}"
+    backend_url: "http://{{ hostvars['appserver'].ansible_host }}/backend"
+  tasks:
+    - name: Show how to reach the deployed apps
+      ansible.builtin.debug:
+        msg:
+          - "Frontend (Caddy):  {{ app_url }}"
+          - "Frontend health:   {{ app_url }}/caddy-health"
+          - "Backend (Caddy):   {{ backend_url }}"
+          - "Grafana:       http://{{ hostvars['observer'].ansible_host }}:3000  (admin / admin)"
+          - "Alerts (ntfy): https://ntfy.sh/alekc-project-observability-demo"
+          - "SSH appserver:   ssh -i {{ hostvars['appserver'].ansible_ssh_private_key_file }} ubuntu@{{ hostvars['appserver'].ansible_host }}"
+          - "SSH observer:   ssh -i {{ hostvars['observer'].ansible_ssh_private_key_file }} ubuntu@{{ hostvars['observer'].ansible_host }}"
+          - ""
+          - "Alerts are per service (job=frontend / job=backend): drive whichever"
+          - "service you want to see fire. Same endpoints on both, only the base"
+          - "URL differs (frontend on /, backend on /backend)."
+          - ""
+          - "FRONTEND triggers:"
+          - "  Errors (HighErrorRate, ~90s):"
+          - "    while true; do curl -s {{ app_url }}/error >/dev/null; sleep 0.2; done"
+          - "  Mixed 200s + 500s for a realistic error rate:"
+          - "    while true; do curl -s {{ app_url }}/ >/dev/null; curl -s {{ app_url }}/error >/dev/null; sleep 0.2; done"
+          - "  Latency (SlowResponseTime, ~3m):"
+          - "    while true; do curl -s {{ app_url }}/slow >/dev/null; done"
+          - "  CPU (HighCPUUsage, per container, ~2m):"
+          - "    curl '{{ app_url }}/cpu?seconds=200'"
+          - "  Memory (HighMemoryUsage, ~2m):"
+          - "    curl '{{ app_url }}/mem?mb=460&seconds=200'"
+          - ""
+          - "BACKEND triggers:"
+          - "  Errors (HighErrorRate, ~90s):"
+          - "    while true; do curl -s {{ backend_url }}/error >/dev/null; sleep 0.2; done"
+          - "  Mixed 200s + 500s for a realistic error rate:"
+          - "    while true; do curl -s {{ backend_url }}/ >/dev/null; curl -s {{ backend_url }}/error >/dev/null; sleep 0.2; done"
+          - "  Latency (SlowResponseTime, ~3m):"
+          - "    while true; do curl -s {{ backend_url }}/slow >/dev/null; done"
+          - "  CPU (HighCPUUsage, per container, ~2m):"
+          - "    curl '{{ backend_url }}/cpu?seconds=200'"
+          - "  Memory (HighMemoryUsage, ~2m):"
+          - "    curl '{{ backend_url }}/mem?mb=460&seconds=200'"

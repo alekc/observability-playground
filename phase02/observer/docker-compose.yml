@@ -1,0 +1,127 @@
+# observer: observability stack.
+#   mimir   -> metrics store + ruler + embedded alertmanager (:9009)
+#   loki    -> log store (:3100)
+#   grafana -> UI + provisioned datasources/dashboards (:3000)
+services:
+  # Pre-create the data dirs and give Loki's volume to uid 10001 (Loki runs
+  # non-root) before the stores start.
+  init:
+    image: busybox:1.38.0
+    command:
+      - sh
+      - -c
+      - |
+        mkdir -p /mimir/alertmanager-configs /mimir/rules /mimir/blocks /mimir/tsdb
+        mkdir -p /loki/chunks /loki/rules
+        chown -R 10001:10001 /loki
+    volumes:
+      - mimir_data:/mimir
+      - loki_data:/loki
+    networks:
+      - obsnet
+
+  mimir:
+    image: grafana/mimir:3.0.6
+    container_name: mimir
+    restart: unless-stopped
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    command:
+      - -config.file=/etc/mimir/mimir.yaml
+    ports:
+      - "9009:9009"
+    volumes:
+      - ./mimir/mimir.yaml:/etc/mimir/mimir.yaml:ro
+      - ./mimir/alertmanager-fallback.yaml:/etc/mimir/alertmanager-fallback.yaml:ro
+      # Ruler local storage layout is <dir>/<tenant>/<file>; tenant is anonymous.
+      - ../../alerts/rules.yaml:/etc/mimir/rules/anonymous/rules.yaml:ro
+      - mimir_data:/data/mimir
+    mem_limit: 4g
+    # Distroless image (no shell to probe with); readiness is at :9009/ready.
+    networks:
+      - obsnet
+
+  loki:
+    image: grafana/loki:3.7.2
+    container_name: loki
+    restart: unless-stopped
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    command:
+      - -config.file=/etc/loki/loki.yaml
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./loki/loki.yaml:/etc/loki/loki.yaml:ro
+      - loki_data:/data/loki
+    mem_limit: 1g
+    # Distroless image (no shell to probe with); readiness is at :3100/ready.
+    networks:
+      - obsnet
+
+  # Headless Chromium service that renders panels/dashboards to PNG, used for
+  # server-side image rendering (/render URLs). Decoupled from Grafana over HTTP.
+  renderer:
+    image: grafana/grafana-image-renderer:v5.8.8
+    container_name: renderer
+    restart: unless-stopped
+    environment:
+      # v13 requires a non-default token shared with Grafana (JWT signing key).
+      # Override RENDERER_TOKEN for a real deployment; this default is a demo
+      # placeholder, the service only listens on the private obsnet.
+      AUTH_TOKEN: ${RENDERER_TOKEN:-demo-renderer-token}
+    mem_limit: 512m
+    networks:
+      - obsnet
+
+  grafana:
+    image: grafana/grafana:13.0.1
+    container_name: grafana
+    restart: unless-stopped
+    depends_on:
+      mimir:
+        condition: service_started
+      loki:
+        condition: service_started
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_USERS_DEFAULT_THEME: dark
+      # External URL Grafana builds links from (incl. the UI "export as image"
+      # render URL). Must be reachable from the browser, not localhost. Ansible
+      # renders .env with the observer public IP; falls back to localhost for a
+      # plain local `docker compose up`.
+      GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://localhost:3000/}
+      # Default home dashboard = Application Performance.
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/application.json
+      # Server-side rendering via the renderer service (see above). The token
+      # must match the renderer's AUTH_TOKEN.
+      GF_RENDERING_SERVER_URL: http://renderer:8081/render
+      GF_RENDERING_CALLBACK_URL: http://grafana:3000/
+      GF_RENDERING_RENDERER_TOKEN: ${RENDERER_TOKEN:-demo-renderer-token}
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - obsnet
+
+networks:
+  obsnet:
+    driver: bridge
+
+volumes:
+  mimir_data:
+  loki_data:
+  grafana_data:

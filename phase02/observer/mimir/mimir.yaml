@@ -1,0 +1,103 @@
+# Grafana Mimir, single-process (monolithic) mode.
+#
+# target "all,alertmanager" runs ingester, distributor, querier, compactor,
+# store-gateway, ruler and the embedded Alertmanager in one process. Suitable
+# for a single-node demo; see README "Production Considerations" for the
+# microservices alternative.
+
+target: all,alertmanager
+
+# Single-tenant: remote_write/queries carry no X-Scope-OrgID, everything lands
+# under the implicit "anonymous" tenant.
+multitenancy_enabled: false
+
+# Silence the anonymous usage reporter for a self-hosted demo.
+usage_stats:
+  enabled: false
+
+server:
+  http_listen_port: 9009
+  grpc_listen_port: 9095
+  log_level: info
+
+# Filesystem backend for all object storage (blocks, ruler, alertmanager).
+common:
+  storage:
+    backend: filesystem
+    filesystem:
+      dir: /data/mimir
+
+blocks_storage:
+  backend: filesystem
+  filesystem:
+    dir: /data/mimir/blocks
+  bucket_store:
+    sync_dir: /data/mimir/tsdb-sync
+  tsdb:
+    dir: /data/mimir/tsdb
+
+# Single replica: no HA, no cross-node replication (demo sizing).
+ingester:
+  ring:
+    replication_factor: 1
+    kvstore:
+      store: memberlist
+
+store_gateway:
+  sharding_ring:
+    replication_factor: 1
+    kvstore:
+      store: memberlist
+
+compactor:
+  data_dir: /data/mimir/compactor
+  sharding_ring:
+    kvstore:
+      store: memberlist
+
+distributor:
+  ring:
+    kvstore:
+      store: memberlist
+
+memberlist:
+  # Single node: bind locally, no peers to join.
+  bind_port: 7946
+
+# Ruler evaluates the alerting rules loaded from local storage and pushes
+# firing alerts to the embedded Alertmanager.
+ruler:
+  rule_path: /data/mimir/ruler-tmp
+  alertmanager_url: http://localhost:9009/alertmanager
+  enable_api: true
+  # Rescan rules every 1m (default 10m); applied on restart, which the ansible
+  # rules handler triggers.
+  poll_interval: 1m
+
+ruler_storage:
+  backend: local
+  local:
+    directory: /etc/mimir/rules
+
+# Embedded Alertmanager with a fallback config that routes every alert to the
+# demo webhook receiver.
+alertmanager:
+  data_dir: /data/mimir/alertmanager-data
+  external_url: http://localhost:9009/alertmanager
+  fallback_config_file: /etc/mimir/alertmanager-fallback.yaml
+  enable_api: true
+
+# Writable backend so Mimir can persist the fallback config on first start; the
+# "local" backend is read-only and would leave Alertmanager uninitialised.
+alertmanager_storage:
+  backend: filesystem
+  filesystem:
+    dir: /data/mimir/alertmanager-configs
+
+limits:
+  # 30 day block retention.
+  compactor_blocks_retention_period: 30d
+  # Generous ingestion limits for a single-node demo.
+  ingestion_rate: 50000
+  ingestion_burst_size: 100000
+  max_label_names_per_series: 40

@@ -1,0 +1,129 @@
+<mxfile host="app.diagrams.net" agent="project-observability">
+  <diagram id="infra" name="Infrastructure">
+    <mxGraphModel dx="769" dy="468" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="800" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="dsmF3fdefEnRRCT3spSw-2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#E6F2FF;strokeColor=#3399FF;verticalAlign=top;fontStyle=1;align=left;spacingLeft=10;spacingTop=6" value="AWS VPC  10.0.0.0/16  -  single public subnet (10.0.1.0/24), one AZ, IGW + route table" vertex="1">
+          <mxGeometry height="650" width="940" x="429.9984615384614" y="70.00384615384607" as="geometry" />
+        </mxCell>
+        <mxCell id="dsmF3fdefEnRRCT3spSw-3" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;verticalAlign=top;fontStyle=1;align=left;spacingLeft=10;spacingTop=6;movable=0;resizable=0;rotatable=0;deletable=0;editable=0;locked=1;connectable=0;" value="Appserver - Application  (t3.medium)&#xa;SG ingress: 80, 22  (apps bound to 127.0.0.1 only)" vertex="1">
+          <mxGeometry height="430" width="380" x="469.9984615384614" y="140.00384615384607" as="geometry" />
+        </mxCell>
+        <mxCell id="dsmF3fdefEnRRCT3spSw-1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#666666;fontStyle=1" value="User / Browser&#xa;(internet)" vertex="1">
+          <mxGeometry height="60" width="140" x="229.9984615384614" y="350.0038461538461" as="geometry" />
+        </mxCell>
+        <mxCell id="dsmF3fdefEnRRCT3spSw-4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF" value="Caddy&#xa;:80 proxy  -  :2019 metrics" vertex="1">
+          <mxGeometry height="50" width="180" x="489.9984615384614" y="190.00384615384607" as="geometry" />
+        </mxCell>
+        <mxCell id="dsmF3fdefEnRRCT3spSw-5" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366" value="frontend (Go)&#xa;:8080  /metrics  -  job=frontend" vertex="1">
+          <mxGeometry height="50" width="180" x="549.9984615384615" y="260.0038461538461" as="geometry" />
+        </mxCell>
+        <mxCell id="dsmF3fdefEnRRCT3spSw-6" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366" value="backend (Go, same image)&#xa;:8080  /metrics  -  job=backend  (via Caddy /backend)" vertex="1">
+          <mxGeometry height="50" width="180" x="549.9984615384615" y="330.0038461538461" as="geometry" />
+        </mxCell>
+        <mxCell id="dsmF3fdefEnRRCT3spSw-7" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE6CC;strokeColor=#D79B00" value="Grafana Alloy&#xa;scrape (unix + cAdvisor) + Docker log shipper" vertex="1">
+          <mxGeometry height="60" width="340" x="489.9984615384614" y="480.0038461538461" as="geometry" />
+        </mxCell>
+        <mxCell id="dsmF3fdefEnRRCT3spSw-8" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;verticalAlign=top;fontStyle=1;align=left;spacingLeft=10;spacingTop=6" value="Observer - Observability  (t3.large)&#xa;SG ingress: 3000, 9009 (from appserver), 3100 (from appserver), 22" vertex="1">
+          <mxGeometry height="430" width="420" x="909.9984615384615" y="140.00384615384607" as="geometry" />
+        </mxCell>
+        <mxCell id="dsmF3fdefEnRRCT3spSw-9" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1D5E7;strokeColor=#9673A6" value="Mimir&#xa;:9009 metrics + ruler + Alertmanager" vertex="1">
+          <mxGeometry height="60" width="220" x="949.9984615384615" y="200.00384615384607" as="geometry" />
+        </mxCell>
+        <mxCell id="dsmF3fdefEnRRCT3spSw-10" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1D5E7;strokeColor=#9673A6" value="Loki&#xa;:3100 logs" vertex="1">
+          <mxGeometry height="50" width="220" x="949.9984615384615" y="300.0038461538461" as="geometry" />
+        </mxCell>
+        <mxCell id="dsmF3fdefEnRRCT3spSw-11" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1D5E7;strokeColor=#9673A6" value="Grafana&#xa;:3000 dashboards + alerting" vertex="1">
+          <mxGeometry height="50" width="220" x="949.9984615384615" y="390.0038461538461" as="geometry" />
+        </mxCell>
+        <mxCell id="dsmF3fdefEnRRCT3spSw-12" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8CECC;strokeColor=#B85450;fontStyle=1" value="ntfy.sh topic&#xa;alert notifications" vertex="1">
+          <mxGeometry height="60" width="140" x="1419.9984615384615" y="200.00384615384607" as="geometry" />
+        </mxCell>
+        <mxCell id="dsmF3fdefEnRRCT3spSw-13" edge="1" parent="1" source="dsmF3fdefEnRRCT3spSw-1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block" target="dsmF3fdefEnRRCT3spSw-4" value="HTTP :80 (/ and /backend)">
+          <mxGeometry relative="1" x="0.2239" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="290" y="215" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="dsmF3fdefEnRRCT3spSw-15" edge="1" parent="1" source="dsmF3fdefEnRRCT3spSw-4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block" target="dsmF3fdefEnRRCT3spSw-5" value="/ proxy">
+          <mxGeometry relative="1" x="-0.4667" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="520" y="260" />
+              <mxPoint x="520" y="260" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="dsmF3fdefEnRRCT3spSw-16" edge="1" parent="1" source="dsmF3fdefEnRRCT3spSw-4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block" target="dsmF3fdefEnRRCT3spSw-6" value="/backend proxy">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="490" y="355" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="dsmF3fdefEnRRCT3spSw-17" edge="1" parent="1" source="dsmF3fdefEnRRCT3spSw-7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;endArrow=open" target="dsmF3fdefEnRRCT3spSw-4" value="scrape job=caddy">
+          <mxGeometry relative="1" x="0.5593" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="820" y="215" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="dsmF3fdefEnRRCT3spSw-18" edge="1" parent="1" source="dsmF3fdefEnRRCT3spSw-7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;endArrow=open" target="dsmF3fdefEnRRCT3spSw-5" value="scrape job=frontend">
+          <mxGeometry relative="1" x="0.0149" y="20" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="810" y="285" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="dsmF3fdefEnRRCT3spSw-19" edge="1" parent="1" source="dsmF3fdefEnRRCT3spSw-7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;endArrow=open" target="dsmF3fdefEnRRCT3spSw-6" value="scrape job=backend">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="770" y="355" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="dsmF3fdefEnRRCT3spSw-20" edge="1" parent="1" source="dsmF3fdefEnRRCT3spSw-7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#9673A6" target="dsmF3fdefEnRRCT3spSw-9" value="remote_write metrics&#xa;:9009/api/v1/push">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1240" y="510" />
+              <mxPoint x="1240" y="210" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="dsmF3fdefEnRRCT3spSw-21" edge="1" parent="1" source="dsmF3fdefEnRRCT3spSw-7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;strokeColor=#9673A6" target="dsmF3fdefEnRRCT3spSw-10" value="push logs&#xa;:3100/loki/api/v1/push">
+          <mxGeometry relative="1" x="-0.1579" y="-50" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="930" y="490" />
+              <mxPoint x="930" y="325" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="dsmF3fdefEnRRCT3spSw-22" edge="1" parent="1" source="dsmF3fdefEnRRCT3spSw-11" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block" target="dsmF3fdefEnRRCT3spSw-9" value="PromQL">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1220" y="415" />
+              <mxPoint x="1220" y="250" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="dsmF3fdefEnRRCT3spSw-23" edge="1" parent="1" source="dsmF3fdefEnRRCT3spSw-11" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block" target="dsmF3fdefEnRRCT3spSw-10" value="LogQL">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1090" y="370" />
+              <mxPoint x="1090" y="370" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="dsmF3fdefEnRRCT3spSw-24" edge="1" parent="1" source="dsmF3fdefEnRRCT3spSw-9" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;endArrow=block;strokeColor=#B85450" target="dsmF3fdefEnRRCT3spSw-12" value="alerts (webhook)">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

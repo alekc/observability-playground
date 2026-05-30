@@ -1,0 +1,3 @@
+---
+# Resolved from phase01 outputs at runtime.
+ansible_host: "{{ lookup('cloud.terraform.tf_output', 'observer_public_ip', project_path=phase01_dir, binary_path=tofu_bin) }}"

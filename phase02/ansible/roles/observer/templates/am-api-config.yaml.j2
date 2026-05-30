@@ -1,0 +1,6 @@
+{# Wraps the repo's alertmanager-fallback.yaml into the body the Mimir
+   Alertmanager config API (POST /api/v1/alerts) expects: the AM config as an
+   indented literal block under alertmanager_config. #}
+template_files: {}
+alertmanager_config: |
+{{ lookup('file', playbook_dir ~ '/../observer/mimir/alertmanager-fallback.yaml') | indent(2, true) }}

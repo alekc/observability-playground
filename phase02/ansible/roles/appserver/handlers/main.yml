@@ -1,0 +1,10 @@
+---
+# Restart only caddy + alloy to reload their config, leaving the app containers
+# untouched.
+- name: Restart caddy and alloy
+  community.docker.docker_compose_v2:
+    project_src: "{{ remote_dir }}/phase02/appserver"
+    state: restarted
+    services:
+      - caddy
+      - alloy

@@ -1,0 +1,8 @@
+---
+collections:
+  # docker_compose_v2 module; shells out to the docker compose CLI plugin.
+  - name: community.docker
+    version: ">=3.6.0"
+  # tf_output lookup: reads phase01 OpenTofu outputs for the inventory.
+  - name: cloud.terraform
+    version: ">=4.0.0"

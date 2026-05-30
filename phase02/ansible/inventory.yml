@@ -1,0 +1,11 @@
+---
+# Two static hosts; their addresses are NOT hardcoded. Each host's ansible_host
+# (and appserver's observer_private_ip) is resolved at runtime from the phase01
+# OpenTofu outputs via the cloud.terraform.tf_output lookup. See
+# host_vars/appserver.yml and host_vars/observer.yml.
+#
+# Phase01 must be applied first so phase01/terraform.tfstate exists.
+all:
+  hosts:
+    appserver:
+    observer:
